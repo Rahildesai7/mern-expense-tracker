@@ -1,13 +1,16 @@
 const express = require('express');
 const User = require('../models/user.model');
 var bcrypt = require('bcrypt-nodejs');
-//const mongoose = require('mongoose');
 const passport = require('passport');
-const LocalStrategy = require("passport-local");
+const passportConfig = require('../passport');
+const JWT = require('jsonwebtoken');
 
-passport.use(new LocalStrategy(User.authenticate())); 
-passport.serializeUser(User.serializeUser()); 
-passport.deserializeUser(User.deserializeUser()); 
+const signToken = userID =>{
+  return JWT.sign({
+      iss : "Rahil",
+      sub : userID
+  },"devRahil",{expiresIn : "1h"});
+}
 
 const router = express.Router();
 
@@ -29,17 +32,37 @@ router.post('/add', async(req,res)=>{
 
 });
 
-router.post('/login', passport.authenticate("local", { 
-    successRedirect: "/users", 
-    failureRedirect: "/users/login"
-}), function (req, res) { 
-}); 
-  
-//Handling user logout  
-router.get("/logout", function (req, res) { 
-    req.logout(); 
-    res.redirect("/users"); 
-}); 
+/* router.post('/login', passport.authenticate('local.login', {
+  //successRedirect: 'http://localhost:3000/users',
+  failureRedirect: 'http://localhost:3000/users/login',
+  //failureFlash: true
+}), function (req, res, next) {
+    return res.json('Success');
+});
+ */
+
+router.post('/login', passport.authenticate('local.login',{session: false}), (req, res)=>{
+  if(req.isAuthenticated()){
+    const {_id, email} = req.user;
+    const token = signToken(_id);
+    res.cookie("access_token ",token,{httpOnly: true, sameSite:true}); 
+    res.status(200).json({isAuthenticated : true, user : email});
+  }
+});
+    
+router.get('/logout', (req, res)=>{
+  req.logout();
+  res.clearCookie("access_token");
+  res.status(200).json('logged out')
+  //res.redirect('/users');
+});
+
+/* router.get("/logout", passport.authenticate('jwt',{session: false}), (req, res) => { 
+  res.clearCookie("access_token");
+  req.logout();
+  res.json({user: {email:""}, success:true}); 
+  //res.redirect("/users"); 
+});  */
   
 function isLoggedIn(req, res, next) { 
     if (req.isAuthenticated()) return next(); 
